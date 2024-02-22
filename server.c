@@ -16,52 +16,80 @@
     FILE *file;                                                                \
     uint64_t length = 0;                                                       \
     file = fopen(FILE_NAME, "r");                                              \
-    if (file == NULL)                                                          \
+    if (file == NULL) {                                                        \
       err("could not read file");                                              \
-    fseek(file, 0, SEEK_END);                                                  \
-    fseek(file, 0, SEEK_SET);                                                  \
+      break;                                                                   \
+    }                                                                          \
+    if (fseek(file, 0, SEEK_END) != 0) {                                       \
+      err("could not seek end of file");                                       \
+      fclose(file);                                                            \
+      break;                                                                   \
+    }                                                                          \
     length = ftell(file);                                                      \
+    if (length == -1) {                                                        \
+      err("could not determine file length");                                  \
+      fclose(file);                                                            \
+      break;                                                                   \
+    }                                                                          \
+    if (fseek(file, 0, SEEK_SET) != 0) {                                       \
+      err("could not seek set");                                               \
+      fclose(file);                                                            \
+      break;                                                                   \
+    }                                                                          \
     HOLDER = malloc(length);                                                   \
-    if (!HOLDER)                                                               \
+    if (!HOLDER) {                                                             \
       err("could not allocate memory to the file string buffer");              \
-    fread(HOLDER, 1, length, file);                                            \
+      fclose(file);                                                            \
+      break;                                                                   \
+    }                                                                          \
+    if (fread(HOLDER, 1, length, file) != length) {                            \
+      err("error reading file content");                                       \
+      free(HOLDER);                                                            \
+      fclose(file);                                                            \
+      break;                                                                   \
+    }                                                                          \
     fclose(file);                                                              \
   } while (0)
 
-struct BinTree create_router() {
-  struct BinTree tree;
+static struct Bintree *router_tree;
 
-  struct Route *route = &(struct Route){
-      .html_path = "/resources/index.html",
-      .css_path = "/resources/index.css",
-  };
-  struct Node *root = &(struct Node){
-      .route = route,
-      .key = "/index",
-  };
+struct Bintree *setup_router() {
+  struct Bintree *tree = malloc(sizeof(struct Bintree));
+  struct Route *route = malloc(sizeof(struct Route));
+  route->html_path = "route/index.html";
+  route->css_path = "route/index.css";
+
+  struct Node *root = malloc(sizeof(struct Node));
+  root->route = route;
+  root->key = "/index";
+
   root = bin_t_insert(root, "/about",
                       &(struct Route){
-                          .html_path = "/resources/about/about.html",
-                          .css_path = "/resources/about/about.css",
+                          .html_path = "route/about/about.html",
+                          .css_path = "route/about/about.css",
                       });
   root = bin_t_insert(root, "/projects",
                       &(struct Route){
-                          .html_path = "/resources/projects/projects.html",
-                          .css_path = "/resources/projects/projects.css",
+                          .html_path = "route/projects/projects.html",
+                          .css_path = "route/projects/projects.css",
                       });
+
+  tree->root = root;
   return tree;
 }
 
-void handle_client(void *network_nodes) {
+void handle_client(void **network_nodes) {
   // get the client struct ( encapsulation of the client socket ) from the void*
-  // args given from pthread
+  // args given from pthread_t
+  warn("%d %d", ((struct Client *)(network_nodes[1]))->sockfd,
+       ((struct Server *)(network_nodes[1]))->sockfd);
   struct Client client = *((struct Client *)(((void **)network_nodes)[0]));
   okay("client ip : %s connected to the server",
        get_client_addr_str(((void **)network_nodes)[0]));
   // handle client runs whenever a client connects to the server socket
-  struct BinTree router_tree = create_router();
-  char *html_file = 0;
-  JSON_FORMAT(router_tree.root->route->html_path, &html_file);
+  char *html_file;
+  JSON_FORMAT(router_tree->root->route->html_path, html_file);
+  warn("%ld length of file ", strlen(html_file));
   char buffer[2048], response[strlen(html_file) + 100];
   bzero(&buffer, 2048);
   read(client.sockfd, buffer, 2048);
@@ -76,9 +104,9 @@ void handle_client(void *network_nodes) {
 }
 
 int main(void) {
-
   struct Server server = server_init(100, AF_INET, SOCK_STREAM, 0, 6969,
                                      "127.0.0.1", handle_client);
+  router_tree = setup_router();
   for (;;) {
     struct Client client = client_init(&server);
     void *network_nodes[2];
@@ -88,10 +116,10 @@ int main(void) {
       continue;
     } else {
       pthread_t thread_id;
-      pthread_create(&thread_id, NULL, (void *)&handle_client,
-                     (void *)network_nodes);
+      pthread_create(&thread_id, NULL, (void *(*)(void *))handle_client,
+                     (void **)network_nodes);
+      pthread_detach(thread_id);
     }
   }
-
   return EXIT_SUCCESS;
 }

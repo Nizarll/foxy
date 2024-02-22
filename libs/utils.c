@@ -6,7 +6,7 @@ void build_http_response(const char *file_name, const char *file_ext, char i) {}
 
 struct Server server_init(int backlog, int domain, int service, int protocol,
                           int port, char *address,
-                          void (*handle_client)(void *)) {
+                          void (*handle_client)(void **)) {
   struct Server server;
   memset(&server, 0, sizeof(struct Server));
   server.backlog = backlog;
@@ -65,49 +65,49 @@ char *get_client_addr_str(struct Client *client) {
   return str;
 }
 
-struct Node* bin_t_create_node(char* key, struct Route* route) {
-    struct Node* newNode = (struct Node*)malloc(sizeof(struct Node));
-    if (newNode == NULL) {
-        printf("Memory allocation failed\n");
-        exit(1);
-    }
-    newNode->key = strdup(key);
-    newNode->route = route;
-    newNode->left = newNode->right = NULL;
-    return newNode;
+struct Node *bin_t_create_node(char *key, struct Route *route) {
+  struct Node *newNode = (struct Node *)malloc(sizeof(struct Node));
+  if (newNode == NULL) {
+    printf("Memory allocation failed\n");
+    exit(1);
+  }
+  newNode->key = strdup(key);
+  newNode->route = route;
+  newNode->left = newNode->right = NULL;
+  return newNode;
 }
 
-struct Node* bin_t_insert(struct Node* root, char* key, struct Route* route) {
-    if (root == NULL) {
-        return bin_t_create_node(key, route);
-    }
-    int cmp = strcmp(key, root->key);
-    if (cmp < 0) {
-        root->left = bin_t_insert(root->left, key, route);
-    } else if (cmp > 0) {
-        root->right = bin_t_insert(root->right, key, route);
-    } else {
-      warn("binary tree key already has a value");
-    }
+struct Node *bin_t_insert(struct Node *root, char *key, struct Route *route) {
+  if (root == NULL) {
+    return bin_t_create_node(key, route);
+  }
+  int cmp = strcmp(key, root->key);
+  if (cmp < 0) {
+    root->left = bin_t_insert(root->left, key, route);
+  } else if (cmp > 0) {
+    root->right = bin_t_insert(root->right, key, route);
+  } else {
+    warn("binary tree key already has a value");
+  }
+  return root;
+}
+
+struct Node *bin_t_lookup(struct Node *root, char *key) {
+  if (root == NULL || strcmp(root->key, key) == 0) {
     return root;
+  }
+  if (strcmp(key, root->key) < 0) {
+    return bin_t_lookup(root->left, key);
+  } else {
+    return bin_t_lookup(root->right, key);
+  }
 }
 
-struct Node* bin_t_lookup(struct Node* root, char* key) {
-    if (root == NULL || strcmp(root->key, key) == 0) {
-        return root;
-    }
-    if (strcmp(key, root->key) < 0) {
-        return bin_t_lookup(root->left, key);
-    } else {
-        return bin_t_lookup(root->right, key);
-    }
-}
-
-void bin_t_free(struct Node* root) {
-    if (root != NULL) {
-        bin_t_free(root->left);
-        bin_t_free(root->right);
-        free(root->key);
-        free(root);
-    }
+void bin_t_free(struct Node *root) {
+  if (root != NULL) {
+    bin_t_free(root->left);
+    bin_t_free(root->right);
+    free(root->key);
+    free(root);
+  }
 }

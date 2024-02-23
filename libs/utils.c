@@ -1,8 +1,46 @@
 #include "utils.h"
 #include <netinet/in.h>
 
-void handle_http_request() {}
-void build_http_response(const char *file_name, const char *file_ext, char i) {}
+struct Bintree router_tree = (struct Bintree){
+    .root =
+        &(struct Node){
+            .key = "/index",
+            .route =
+                &(struct Route){
+                    .html_path = "route/index.html",
+                    .css_path = "route/index.css",
+                },
+        },
+};
+
+char *handle_http_request(char *http_request) {
+  okay("%s", http_request);
+  char *token = strtok(http_request, " \n");
+  char *file = NULL;
+  char *extension = NULL;
+  while (token != NULL) {
+    if (strcmp(token, "GET") == 0) {
+      token = strtok(NULL, " \n");
+      if (token != NULL) {
+        file = strtok(token, ".");
+        extension = strtok(NULL, ".");
+      }
+      break; // Exit the loop after finding "GET" method
+    }
+    token = strtok(NULL, " \n");
+  }
+
+  // If file and extension are found, print them
+  if (file != NULL && extension != NULL) {
+    printf("Requested file: %s\n", file);
+    printf("Extension: %s\n", extension);
+  } else {
+    printf("%s %s", extension, file);
+    printf("Invalid HTTP request or missing file extension.\n");
+  }
+  okay("%s, %s", file, extension);
+  return file; // Return the file name (may be NULL)
+}
 
 struct Server server_init(int backlog, int domain, int service, int protocol,
                           int port, char *address,
@@ -21,13 +59,13 @@ struct Server server_init(int backlog, int domain, int service, int protocol,
   server.sockfd = socket(server.domain, server.service, server.protocol);
 
   if (server.sockfd == 0)
-    err("Failed to connect to socket %s", errno);
+    err("Failed to connect to socket %s", strerror(errno));
   okay("Created Server Successfully ! ");
   if ((bind(server.sockfd, (struct sockaddr *)&server.address,
             sizeof(server.address))) < 0)
-    err("failed to bind socket %s", errno);
+    err("failed to bind socket %s", strerror(errno));
   if ((listen(server.sockfd, server.backlog)) < 0)
-    err("failed to listen to the socket %s", errno);
+    err("failed to listen to the socket %s", strerror(errno));
 
   server.handle_client = handle_client;
   return server;
@@ -38,7 +76,7 @@ struct Client client_init(struct Server *server) {
   client.socklen = sizeof(struct sockaddr_in);
   if ((client.sockfd = accept(server->sockfd, (struct sockaddr *)&client.addr,
                               (socklen_t *)&client.socklen)) < 0) {
-    warn("client failed to connect to server %s", errno);
+    warn("client failed to connect to server %s", strerror(errno));
   }
   return client;
 }

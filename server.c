@@ -51,31 +51,18 @@
     fclose(file);                                                              \
   } while (0)
 
-static struct Bintree *router_tree;
-
-struct Bintree *setup_router() {
-  struct Bintree *tree = malloc(sizeof(struct Bintree));
-  struct Route *route = malloc(sizeof(struct Route));
-  route->html_path = "route/index.html";
-  route->css_path = "route/index.css";
-
-  struct Node *root = malloc(sizeof(struct Node));
-  root->route = route;
-  root->key = "/index";
-
-  root = bin_t_insert(root, "/about",
-                      &(struct Route){
-                          .html_path = "route/about/about.html",
-                          .css_path = "route/about/about.css",
-                      });
-  root = bin_t_insert(root, "/projects",
-                      &(struct Route){
-                          .html_path = "route/projects/projects.html",
-                          .css_path = "route/projects/projects.css",
-                      });
-
-  tree->root = root;
-  return tree;
+void setup_router() {
+  router_tree.root = bin_t_insert(router_tree.root, "/about",
+                                  &(struct Route){
+                                      .html_path = "route/about/about.html",
+                                      .css_path = "route/about/about.css",
+                                  });
+  router_tree.root =
+      bin_t_insert(router_tree.root, "/projects",
+                   &(struct Route){
+                       .html_path = "route/projects/projects.html",
+                       .css_path = "route/projects/projects.css",
+                   });
 }
 
 void handle_client(void **network_nodes) {
@@ -88,11 +75,12 @@ void handle_client(void **network_nodes) {
        get_client_addr_str(((void **)network_nodes)[0]));
   // handle client runs whenever a client connects to the server socket
   char *html_file;
-  JSON_FORMAT(router_tree->root->route->html_path, html_file);
+  JSON_FORMAT(router_tree.root->route->html_path, html_file);
   warn("%ld length of file ", strlen(html_file));
-  char buffer[2048], response[strlen(html_file) + 100];
-  bzero(&buffer, 2048);
-  read(client.sockfd, buffer, 2048);
+  char buffer[50], response[strlen(html_file) + 100];
+  bzero(&buffer, 50);
+  read(client.sockfd, buffer, 50);
+  handle_http_request(buffer);
   sprintf(response, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n");
   strcat(response, html_file);
   strcat(response, "\r\n");
@@ -104,9 +92,9 @@ void handle_client(void **network_nodes) {
 }
 
 int main(void) {
-  struct Server server = server_init(100, AF_INET, SOCK_STREAM, 0, 6969,
+  struct Server server = server_init(100, AF_INET, SOCK_STREAM, 0, 3000,
                                      "127.0.0.1", handle_client);
-  router_tree = setup_router();
+  setup_router();
   for (;;) {
     struct Client client = client_init(&server);
     void *network_nodes[2];

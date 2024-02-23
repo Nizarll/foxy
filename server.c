@@ -74,17 +74,13 @@ void handle_client(void **network_nodes) {
   okay("client ip : %s connected to the server",
        get_client_addr_str(((void **)network_nodes)[0]));
   // handle client runs whenever a client connects to the server socket
-  char *html_file;
-  JSON_FORMAT(router_tree.root->route->html_path, html_file);
-  warn("%ld length of file ", strlen(html_file));
-  char buffer[50], response[strlen(html_file) + 100];
-  bzero(&buffer, 50);
-  read(client.sockfd, buffer, 50);
-  handle_http_request(buffer);
-  sprintf(response, "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n");
-  strcat(response, html_file);
-  strcat(response, "\r\n");
-  int bytes_sent = send((client.sockfd), &response, strlen(response), 0);
+  char buffer[4096];
+  bzero(&buffer, 4095);
+  read(client.sockfd, buffer, 4095);
+  char *http_response = handle_http_request(buffer);
+  warn("%s", http_response);
+  int bytes_sent =
+      send((client.sockfd), http_response, strlen(http_response), 0);
   if (bytes_sent < 0) {
     err("could not send data %s", strerror(errno));
   }

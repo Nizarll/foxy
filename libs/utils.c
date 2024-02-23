@@ -16,30 +16,37 @@ struct Bintree router_tree = (struct Bintree){
 char *handle_http_request(char *http_request) {
   okay("%s", http_request);
   char *token = strtok(http_request, " \n");
-  char *file = NULL;
-  char *extension = NULL;
+  char *filename = NULL, *extension = NULL, *content = NULL;
+  char header[4096] = "HTTP/1.1 200 OK\r\nContent-Type: ";
   while (token != NULL) {
     if (strcmp(token, "GET") == 0) {
       token = strtok(NULL, " \n");
       if (token != NULL) {
-        file = strtok(token, ".");
+        filename = strtok(token, ".");
         extension = strtok(NULL, ".");
       }
-      break; // Exit the loop after finding "GET" method
+      break;
     }
     token = strtok(NULL, " \n");
   }
-
-  // If file and extension are found, print them
-  if (file != NULL && extension != NULL) {
-    printf("Requested file: %s\n", file);
-    printf("Extension: %s\n", extension);
-  } else {
-    printf("%s %s", extension, file);
-    printf("Invalid HTTP request or missing file extension.\n");
+  if (filename != NULL) {
+    if (strcmp(filename, "/") == 0) {
+      strcat(header, "text/html\r\n\r\n");
+      JSON_FORMAT(router_tree.root->route->html_path, content);
+    } else {
+      if (strcmp(extension, "css") == 0)
+        strcat(header, "text/css\r\n\r\n");
+      if (strcmp(extension, "html") == 0)
+        strcat(header, "text/html\r\n\r\n");
+      JSON_FORMAT(bin_t_lookup(router_tree.root, filename)->route->css_path,
+                  content);
+    }
+    char *response = malloc(strlen(header) + strlen(content) + 1);
+    strcpy(response, header);
+    strcat(response, content);
+    return response;
   }
-  okay("%s, %s", file, extension);
-  return file; // Return the file name (may be NULL)
+  return NULL;
 }
 
 struct Server server_init(int backlog, int domain, int service, int protocol,

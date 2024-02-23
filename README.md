@@ -3,7 +3,7 @@
 foxy is an attempt at making an optimized c web-server that handles
 client http requests !
 
-### [TODO]
+### Todo
 
 ✓ Http handling of different mime type files   
 ✖ Client side tag cache to reduce rendering and memory cost   

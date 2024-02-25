@@ -97,13 +97,13 @@ struct Client {
   socklen_t socklen;
 };
 
-extern struct Bintree router_tree;
+extern struct Bintree *router_tree;
 char *get_client_addr_str(struct Client *client);
 struct Client client_init(struct Server *server);
 struct Server server_init(int backlog, int domain, int service, int protocol,
                           int port, char *address, void (*launch)(void **));
-struct Node *bin_t_create_node(char *key, struct Route *route);
-struct Node *bin_t_insert(struct Node *root, char *key, struct Route *route);
+struct Node *bin_t_create_node(char *key, struct Route route);
+struct Node *bin_t_insert(struct Node *root, struct Node *node);
 struct Node *bin_t_lookup(struct Node *root, char *key);
 void bin_t_free(struct Node *root);
 char *handle_http_request(char *request);

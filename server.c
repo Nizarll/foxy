@@ -1,7 +1,6 @@
 #include "libs/utils.h"
 #include <errno.h>
 #include <pthread.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -52,35 +51,34 @@
   } while (0)
 
 void setup_router() {
-  router_tree.root = bin_t_insert(router_tree.root, "/about",
-                                  &(struct Route){
-                                      .html_path = "route/about/about.html",
-                                      .css_path = "route/about/about.css",
-                                  });
-  router_tree.root =
-      bin_t_insert(router_tree.root, "/projects",
-                   &(struct Route){
-                       .html_path = "route/projects/projects.html",
-                       .css_path = "route/projects/projects.css",
-                   });
+  router_tree->root = bin_t_insert(
+      router_tree->root,
+      bin_t_create_node("/projects", (struct Route){
+                                         .html_path = "route/about/about.html",
+                                         .css_path = "route/about/about.css",
+                                     }));
+  router_tree->root = bin_t_insert(
+      router_tree->root,
+      bin_t_create_node("/about",
+                        (struct Route){.html_path = "route/about/about.html",
+                                       .css_path = "route/index.css"}));
 }
 
 void handle_client(void **network_nodes) {
-  // get the client struct ( encapsulation of the client socket ) from the void*
-  // args given from pthread_t
-  warn("%d %d", ((struct Client *)(network_nodes[1]))->sockfd,
-       ((struct Server *)(network_nodes[1]))->sockfd);
+  // get the client struct ( encapsulation of the client socket ) from the
+  // void* args given from pthread_t
   struct Client client = *((struct Client *)(((void **)network_nodes)[0]));
-  okay("client ip : %s connected to the server",
-       get_client_addr_str(((void **)network_nodes)[0]));
-  // handle client runs whenever a client connects to the server socket
-  char buffer[4096];
-  bzero(&buffer, 4095);
-  read(client.sockfd, buffer, 4095);
-  char *http_response = handle_http_request(buffer);
-  warn("%s", http_response);
+  char request[4096];
+  bzero(&request, 4096);
+  read(client.sockfd, request, 4095);
+  char *http_response = handle_http_request(request);
+  if (http_response == NULL) {
+    close(client.sockfd);
+    return;
+  }
   int bytes_sent =
       send((client.sockfd), http_response, strlen(http_response), 0);
+  free(http_response);
   if (bytes_sent < 0) {
     err("could not send data %s", strerror(errno));
   }

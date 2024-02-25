@@ -1,7 +1,9 @@
 #include "utils.h"
 #include <netinet/in.h>
 
-struct Bintree router_tree = (struct Bintree){
+#define HEADER_LEN 4096
+
+struct Bintree *router_tree = &(struct Bintree){
     .root =
         &(struct Node){
             .key = "/index",
@@ -14,10 +16,9 @@ struct Bintree router_tree = (struct Bintree){
 };
 
 char *handle_http_request(char *http_request) {
-  okay("%s", http_request);
   char *token = strtok(http_request, " \n");
   char *filename = NULL, *extension = NULL, *content = NULL;
-  char header[4096] = "HTTP/1.1 200 OK\r\nContent-Type: ";
+  char header[HEADER_LEN] = "HTTP/1.1 200 OK\r\nContent-Type: ";
   while (token != NULL) {
     if (strcmp(token, "GET") == 0) {
       token = strtok(NULL, " \n");
@@ -29,21 +30,49 @@ char *handle_http_request(char *http_request) {
     }
     token = strtok(NULL, " \n");
   }
+  printf("INFO: %s %s\n", filename, extension);
   if (filename != NULL) {
-    if (strcmp(filename, "/") == 0) {
+    content = NULL;
+    if (extension == NULL) {
       strcat(header, "text/html\r\n\r\n");
-      JSON_FORMAT(router_tree.root->route->html_path, content);
+      if (strcmp(filename, "/") == 0) {
+        JSON_FORMAT(router_tree->root->route->html_path, content);
+      } else {
+        struct Node *node = bin_t_lookup(router_tree->root, filename);
+        if (node != NULL) {
+          okay("ight");
+          printf("\nINFO: %s %s", node->key, node->route->css_path);
+          printf("\n route is %s", node->route->html_path);
+          JSON_FORMAT(node->route->html_path, content);
+        } else {
+          warn("could not find route");
+        }
+      }
     } else {
-      if (strcmp(extension, "css") == 0)
+      if (strcmp(extension, "css") == 0) {
         strcat(header, "text/css\r\n\r\n");
-      if (strcmp(extension, "html") == 0)
-        strcat(header, "text/html\r\n\r\n");
-      JSON_FORMAT(bin_t_lookup(router_tree.root, filename)->route->css_path,
-                  content);
+        struct Node *node = bin_t_lookup(router_tree->root, filename);
+        if (node != NULL) {
+          JSON_FORMAT(node->route->css_path, content);
+        } else {
+          warn("could not find file");
+        }
+      } else {
+        warn("unsupported file extension");
+      }
     }
-    char *response = malloc(strlen(header) + strlen(content) + 1);
+    if (content == NULL) {
+      warn("failed to load content");
+      return NULL;
+    }
+    char *response = malloc(strlen(header) + strlen(content) + 5);
+    if (response == NULL) {
+      warn("failed to allocate memory for response");
+      return NULL;
+    }
     strcpy(response, header);
     strcat(response, content);
+    strcat(response, "\r\n");
     return response;
   }
   return NULL;
@@ -110,30 +139,50 @@ char *get_client_addr_str(struct Client *client) {
   return str;
 }
 
-struct Node *bin_t_create_node(char *key, struct Route *route) {
+struct Node *bin_t_create_node(char *key, struct Route route) {
   struct Node *newNode = (struct Node *)malloc(sizeof(struct Node));
   if (newNode == NULL) {
     printf("Memory allocation failed\n");
     exit(1);
   }
+  struct Route *new_route = malloc(sizeof(struct Route));
+
+  if (route.html_path)
+    new_route->html_path = strdup(route.html_path);
+  if (route.css_path)
+    new_route->css_path = strdup(route.css_path);
+  if (route.js_path)
+    new_route->js_path = strdup(route.js_path);
+
   newNode->key = strdup(key);
-  newNode->route = route;
+  newNode->route = new_route;
   newNode->left = newNode->right = NULL;
   return newNode;
 }
 
-struct Node *bin_t_insert(struct Node *root, char *key, struct Route *route) {
+struct Node *bin_t_insert(struct Node *root, struct Node *node) {
   if (root == NULL) {
-    return bin_t_create_node(key, route);
+    return node;
   }
-  int cmp = strcmp(key, root->key);
+
+  // Compare the key of the new node with the key of the root node
+  int cmp = strcmp(node->key, root->key);
+
+  // If the key of the new node is less than the key of the root node, insert
+  // into the left subtree
   if (cmp < 0) {
-    root->left = bin_t_insert(root->left, key, route);
-  } else if (cmp > 0) {
-    root->right = bin_t_insert(root->right, key, route);
-  } else {
-    warn("binary tree key already has a value");
+    root->left = bin_t_insert(root->left, node);
   }
+  // If the key of the new node is greater than the key of the root node, insert
+  // into the right subtree
+  else if (cmp > 0) {
+    root->right = bin_t_insert(root->right, node);
+  }
+  // If the keys are equal, update the route information
+  else {
+    root->route = node->route;
+  }
+  // Return the root node after insertion
   return root;
 }
 

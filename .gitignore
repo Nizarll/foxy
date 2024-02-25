@@ -1,4 +1,9 @@
+<<<<<<< HEAD
+server
+a.out
+=======
 bin/
 obj/
 a.out
 server
+>>>>>>> 50ac6dd418c05e984c81c002e9265b53e00c1bd4
